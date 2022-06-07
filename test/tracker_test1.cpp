@@ -8,12 +8,16 @@ UnbufferedSerial pc(CONSOLE_TX, CONSOLE_RX, 230400);
 int numSensors = 5;
 
 char tx_buffer[80];
-int sensors[5];
+
+
+static int on_line[1];
+static int sensor_for_end[5];
+static int sensor_val[5];
+static int calMin[5];
+static int calMax[5];
 
 int max_sensor_values[5];
 int min_sensor_values[5];
-
-int online[5];
 
 
 void calibrate_init(int *calibratedMin, int *calibratedMax);
@@ -154,8 +158,6 @@ void calibrate(int *sensor_values, int *calibratedMin, int *calibratedMax){
             if(j == 0 || max_sensor_values[i] < sensor_values[i])
                 max_sensor_values[i] = sensor_values[i];
 
- 
-
             // set the min we found THIS time
             if(j == 0 || min_sensor_values[i] > sensor_values[i])
                 min_sensor_values[i] = sensor_values[i];
@@ -193,21 +195,26 @@ void AnalogRead(int *sensor_values) {
         ch = j;
 
         cs = 0;
-        wait_us(2);
+        // wait_us(2);
 
         values[j] = spi.write(ch<<12);
 
         cs = 1;
-        wait_us(21);
+        // wait_us(21);
 
         values[j] = (values[j]>>6);
     }
 
-    
+    sprintf(tx_buffer, "at analog read: %d %d %d %d %d\r\n", values[0], values[1], values[2], values[3], values[4]);
+    pc.write(tx_buffer, strlen(tx_buffer));
 
     for(i = 0; i < numSensors; i++){
         sensor_values[i] = values[i+1];
     }
+
+    // sprintf(tx_buffer, "at analog read: %d %d %d %d %d\r\n", values[0], values[1], values[2], values[3], values[4]);
+    // pc.write(tx_buffer, strlen(tx_buffer));
+
 }
 
 int main() {
@@ -219,20 +226,22 @@ int main() {
     cs = 1;
 
 
-    calibrate_init(min_sensor_values, max_sensor_values);
-    calibrate(sensors, min_sensor_values, max_sensor_values);
-    readLine(sensors, min_sensor_values, max_sensor_values, online, 0);
+
+
+    calibrate_init(calMin,calMax);
+    calibrate(sensor_val, calMin, calMax);
+    // readLine(sensor_val, calMin, calMax,on_line,1);
     
-    sprintf(tx_buffer, "%d %d %d %d %d\r\n", sensors[0], sensors[1], sensors[2], sensors[3], sensors[4]);
-    pc.write(tx_buffer, strlen(tx_buffer));
+    // sprintf(tx_buffer, "%d %d %d %d %d\r\n", sensors[0], sensors[1], sensors[2], sensors[3], sensors[4]);
+    // pc.write(tx_buffer, strlen(tx_buffer));
 
     ThisThread::sleep_for(3000ms);
     
     while(1){
-        readLine(sensors, min_sensor_values, max_sensor_values, online, 0);
+        // readLine(sensors, min_sensor_values, max_sensor_values, online, 0);
         
-        sprintf(tx_buffer, "%d %d %d %d %d\r\n", sensors[0], sensors[1], sensors[2], sensors[3], sensors[4]);
-        pc.write(tx_buffer, strlen(tx_buffer));
+        // sprintf(tx_buffer, "%d %d %d %d %d\r\n", sensors[0], sensors[1], sensors[2], sensors[3], sensors[4]);
+        // pc.write(tx_buffer, strlen(tx_buffer));
     }
 
 }

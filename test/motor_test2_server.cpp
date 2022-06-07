@@ -153,7 +153,7 @@ int main(){
                 
                 lmotor = PWML;
                 rmotor = PWMR;
-                
+
                 sprintf(motor, "Left motor: %f, Right motor: %f\r\n", lmotor, rmotor);
                 
                 parser->send("AT+CIPSEND=%d,%d\r\n", id, strlen(motor));
@@ -177,6 +177,7 @@ int main(){
                     }
                 }
             }
+
         }
     }
 }
