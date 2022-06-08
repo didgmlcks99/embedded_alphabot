@@ -1,6 +1,6 @@
 #include "mbed.h"
 #include "TRSensors.h"
-#include "PID.h"
+//#include "PID.h"
 
 UnbufferedSerial pc(CONSOLE_TX, CONSOLE_RX, 230400);
 
@@ -11,7 +11,7 @@ TRSensors TR(D11, D12, D13, D10);
 #define RATE 0.1
  
 //Kc, Ti, Td, interval
-PID controller(1.0, 0.0, 0.0, RATE);
+//PID controller(1.0, 0.0, 0.0, RATE);
 /**********Motor********************/
 PwmOut PWMA(D6);  //PB_10,D6
 PwmOut PWMB(D5);
@@ -46,12 +46,15 @@ int main() {
     unsigned int sensor_values[5] = {0};
     
     ThisThread::sleep_for(3000ms);
+    
+    printf("Start alphabot!\r\n");
+    
     while(1) {
         TR.calibrate();
         result = TR.readLine(sensor_values, 1);
         printf("result = %d, sensor values: %u %u %u %u %u\r\n", 
             result, sensor_values[0], sensor_values[1], sensor_values[2], sensor_values[3], sensor_values[4]);
-        ThisThread::sleep_for(1000ms);
+        ThisThread::sleep_for(100ms);
     }
 }
 
