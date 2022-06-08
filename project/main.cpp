@@ -13,13 +13,18 @@ TRSensors TR(D11, D12, D13, D10);
 //Kc, Ti, Td, interval
 //PID controller(1.0, 0.0, 0.0, RATE);
 /**********Motor********************/
-PwmOut PWMA(D6);  //PB_10,D6
-PwmOut PWMB(D5);
+// PwmOut PWMA(D6);  //PB_10,D6
+// PwmOut PWMB(D5);
 
+// left motor
 DigitalOut AIN1(A1);
 DigitalOut AIN2(A0);
+PwmOut PWMA(D6);
+
+// right motoer
 DigitalOut BIN1(A2);
 DigitalOut BIN2(A3);
+PwmOut PWMB(D5);
 
 #define MIDDLE 2000
 int R_PWM;  
@@ -36,8 +41,31 @@ DIRE P_direction;
 DIRE Obs_direction;
 /***********************************/
 
+// ******************희찬이가 만든 pid 변수 선언
+//시작
+
+float Kp = 0.9;
+float Ki = 0.0008;
+float Kd = 0.6;
+int P, I, D;
+
+int lastError = 0;
+
+float maxspeeda = 150;
+float maxspeedb = 150;
+float basespeeda = 50;
+float basespeedb = 50;
+
+void PID_control(unsigned int *sensor_values);
+
+// ******************희찬이가 만든 pid 
+// 끝
+
+
 void Motor_init();
 void Motor_Stop();
+void Motor_Left();
+void Motor_Right();
 
 int main() {
     int result = 0;
@@ -48,30 +76,20 @@ int main() {
     ThisThread::sleep_for(3000ms);
     
     printf("Start alphabot!\r\n");
-    
-    float speed = 0.8;
-    int speed_dir = 1;
 
-    PWMB.pulsewidth_us(500);
     PWMA.pulsewidth_us(500);
+    PWMB.pulsewidth_us(500);
+
+    PWMA = basespeeda / maxspeeda; 
+    PWMB = basespeedb / maxspeedb;
     
     while(1) {
-        PWMB = speed;
-        PWMA = speed;
-
-        if(speed < 0.3){
-            speed_dir = -1;
-        }else if (speed > 0.9) {
-            speed_dir = 1;
-        }
-
-        speed -= (speed_dir*0.01);
-
-        TR.calibrate();
-        result = TR.readLine(sensor_values, 1);
-        printf("speed = %f, result = %d  , sensor values: %u %u %u %u %u\r\n", 
-            speed, result, sensor_values[0], sensor_values[1], sensor_values[2], sensor_values[3], sensor_values[4]);
-        ThisThread::sleep_for(100ms);
+        PID_control(sensor_values);
+        // TR.calibrate();
+        // result = TR.readLine(sensor_values, 1);
+        // printf("speed = %f, result = %d  , sensor values: %u %u %u %u %u\r\n", 
+        //     (float)(basespeeda / maxspeeda), result, sensor_values[0], sensor_values[1], sensor_values[2], sensor_values[3], sensor_values[4]);
+        // ThisThread::sleep_for(100ms);
     }
 }
 
@@ -92,14 +110,47 @@ void Motor_init(){
     AIN2 = 0;
     BIN1 = 1;
     BIN2 = 0;
-    PWMB.period_us(500);
-    PWMA.period_us(500);
-    
-    den = 0;
-    R_PWM = 0;
-    L_PWM = 0;
-    weight= 0;
-    print_c = 0;
 
+    PWMA.period_us(500);
+    PWMB.period_us(500);
     
+    // den = 0;
+    // R_PWM = 0;
+    // L_PWM = 0;
+    // weight= 0;
+    // print_c = 0;
+}
+
+void PID_control(unsigned int *sensor_values){
+    TR.calibrate();
+    uint16_t position = TR.readLine(sensor_values, 1);
+    int error = 2000 - position;
+
+    P = error;
+    I = I + error;
+    D = error - lastError;
+    lastError = error;
+    int motorSpeed = P*Kp + I*Ki + D*Kd;
+
+    int motorspeeda = basespeeda + motorSpeed;
+    int motorspeedb = basespeedb - motorSpeed;
+
+    if (motorspeeda > maxspeeda) {
+        motorspeeda = maxspeeda;
+    }
+    if (motorspeedb > maxspeedb) {
+        motorspeedb = maxspeedb;
+    }
+    if (motorspeeda < 0) {
+        motorspeeda = 0;
+    }
+    if (motorspeedb < 0) {
+        motorspeedb = 0;
+    }
+    
+    PWMA = motorspeeda / maxspeeda;
+    PWMB = motorspeedb / maxspeedb;
+    
+    printf("error: %d, speedA: %f, speedB: %f, position: %d\r\n", 
+        error, (motorspeeda / maxspeeda), (motorspeedb / maxspeedb), position);
 }
