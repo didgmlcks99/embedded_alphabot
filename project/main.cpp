@@ -64,8 +64,6 @@ void PID_control(unsigned int *sensor_values);
 
 void Motor_init();
 void Motor_Stop();
-void Motor_Left();
-void Motor_Right();
 
 int main() {
     int result = 0;
@@ -80,8 +78,8 @@ int main() {
     PWMA.pulsewidth_us(500);
     PWMB.pulsewidth_us(500);
 
-    PWMA = basespeeda / maxspeeda; 
-    PWMB = basespeedb / maxspeedb;
+    PWMA = basespeeda / 200.0; 
+    PWMB = basespeedb / 200.0;
     
     while(1) {
         PID_control(sensor_values);
@@ -113,6 +111,8 @@ void Motor_init(){
 
     PWMA.period_us(500);
     PWMB.period_us(500);
+
+    I = 0;
     
     // den = 0;
     // R_PWM = 0;
@@ -148,8 +148,8 @@ void PID_control(unsigned int *sensor_values){
         motorspeedb = 0;
     }
     
-    PWMA = motorspeeda / maxspeeda;
-    PWMB = motorspeedb / maxspeedb;
+    PWMA = motorspeeda / 200.0;
+    PWMB = motorspeedb / 200.0;
     
     printf("error: %d, speedA: %f, speedB: %f, position: %d\r\n", 
         error, (motorspeeda / maxspeeda), (motorspeedb / maxspeedb), position);
