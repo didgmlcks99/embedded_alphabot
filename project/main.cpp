@@ -2,6 +2,9 @@
 #include "TRSensors.h"
 //#include "PID.h"
 
+#include "RemoteIR.h"
+#include "ReceiverIR.h"
+
 UnbufferedSerial pc(CONSOLE_TX, CONSOLE_RX, 230400);
 
 /**********tracker sensor***********/
@@ -68,8 +71,18 @@ void Motor_init();
 void Motor_Stop();
 void PID_control(unsigned int *sensor_values);
 
+float rightvar = 0.013;
+float speed = 0.3;
+uint8_t buf[8];
+bool calibration = true;
+
+RemoteIR::Format format = RemoteIR::NEC;
+ReceiverIR irrecv(D4);
+
+void REMOTE_control();
+
 int main() {
-    printf("\r\n\nStart!!\t\n\n");
+    printf("\r\n\nAlphabot on!!\t\n\n");
     
     int result = 0;
     Motor_init();
@@ -80,14 +93,136 @@ int main() {
     
     printf("Start alphabot!\r\n");
 
+    
+    REMOTE_control();
+
     PWMA.pulsewidth_us(500);
     PWMB.pulsewidth_us(500);
 
     PWMA = basespeeda / 200.0; 
     PWMB = basespeedb / 200.0;
     
+    printf("start line tracing!\r\n");
+
     while(1) {
         PID_control(sensor_values);
+    }
+}
+
+void REMOTE_control(){
+    while(1){
+        if(irrecv.getState() == ReceiverIR::Received
+            && irrecv.getData(&format, buf, sizeof(buf)*8) != 0){
+            switch(buf[3]){
+                case 0xBA: 
+                    break; //ch --
+                case 0xB9: 
+                    break; //ch
+                case 0xBB: 
+                    rightvar -= 0.05;
+                    if(rightvar < -2.0) rightvar = -2.0;
+                    break; //<<
+                case 0xBF: 
+                    rightvar += 0.05;
+                    if(rightvar > 2.0) rightvar = 2.0;
+                    break; //>>
+                case 0xBC: 
+                    calibration = false; 
+                    printf("done with remote mode\r\n");
+                    break;    //>||
+                case 0xF8: 
+                    speed -= 0.1;
+                    if( speed < -1.0) speed = -1.0;
+                    printf("speed down\r\n");
+                    break;    // -
+                case 0xEA: 
+                    speed += 0.1;
+                    if( speed >1.0) speed = 1.0;
+                    printf("speed up\r\n");
+                    break;    // +
+                case 0xF6:
+                    // left.speed(0.2);
+                    // right.speed(-0.2);
+                    // oled.clearDisplay();
+                    // oled.printf("Calibrating\r");
+                    // oled.display();
+                    printf("Calibrating\r\n");
+
+                    for (int i =0; i< 100; i++)
+                        TR.calibrate();
+
+                    printf("done calibrating\r\n");
+                    
+                    // oled.clearDisplay();
+                    // oled.printf("Calibrated!!\r");
+                    // oled.display();
+                    
+                    // for(int i =0; i<5;i++){
+                    //     pc.printf("MIN: %d, MAX: %d\r\n", MINIR[i], MAXIR[i]);    
+                    // }
+                    //    wait(0.7);
+                    //    left.speed(0.0);
+                    //    right.speed(0.0);
+                    // pc.printf("\r\ncalibrated\r\n"); 
+                    break;    //EQ
+                case 0xE6: 
+                    break;    //100+
+                case 0xF2: 
+                    break;    //200+
+                case 0xE9: 
+                    break;    //0
+                case 0xF3: 
+                    break;    //1
+                case 0xE7: 
+                    PWMA = speed;
+                    PWMB = speed + rightvar;
+                    printf("front\r\n");
+                    // left.speed(speed);
+                    // right.speed(speed + rightvar);
+                    break;    //2
+                case 0xA1: 
+                    break;    //3
+                case 0xF7:
+                    PWMA = speed / 2;
+                    PWMB = speed + rightvar;
+                    printf("left\r\n"); 
+                    // left.speed(speed/2);
+                    // right.speed(speed + rightvar);
+                    break;    //4
+                case 0xE3:                 
+                    PWMA = 0.0;
+                    PWMB = 0.0;
+                    printf("stop\r\n");
+                    // left.speed(0);
+                    // right.speed(0);
+                    break;    //5
+                case 0xA5: 
+                    PWMA = speed;
+                    PWMB = speed/2 + rightvar;
+                    printf("right\r\n");
+                    // left.speed(speed);
+                    // right.speed(speed/2 + rightvar);
+                    break;    //6
+                case 0xBD: 
+                    break;    //7
+                case 0xAD: 
+                    PWMA = -speed;
+                    PWMB = -(speed + rightvar);
+                    printf("back?\r\n");
+                    // left.speed(-speed);
+                    // right.speed(-(speed + rightvar));
+                    break;    //8
+                case 0xB5: 
+                    break;    //9 
+                default:
+                    break;
+            }
+        }
+        
+        if(!calibration) {
+            printf("calibration false");
+            break;
+        }
     }
 }
 
