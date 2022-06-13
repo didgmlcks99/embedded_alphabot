@@ -26,7 +26,6 @@ DigitalOut BIN1(A2);
 DigitalOut BIN2(A3);
 PwmOut PWMB(D5);
 
-#define MIDDLE 2000
 int R_PWM;  
 int L_PWM;
 int weight; int P_weight;
@@ -34,38 +33,44 @@ int P_temp; int Fix_temp;
 int print_c;
 int den;
 static int on_line[1];
-typedef enum{LEFT = 0, RIGHT} DIRE;
-DIRE direction;
-DIRE Over_direction;
-DIRE P_direction;
-DIRE Obs_direction;
+//typedef enum{LEFT = 0, RIGHT} DIRE;
+//DIRE direction;
+//DIRE Over_direction;
+//DIRE P_direction;
+//DIRE Obs_direction;
 /***********************************/
+/**********PID********************/
+float Kp = 0.08;
+float Ki = 0.0006;
+float Kd = 10;
 
-// ******************희찬이가 만든 pid 변수 선언
-//시작
+int threshold = 300;
+int Lweight = 0, Rweight = 0;
+enum MotorState {
+    Middle, Left, Right
+};
 
-float Kp = 0.9;
-float Ki = 0.0008;
-float Kd = 0.6;
-int P, I, D;
+MotorState curState = Middle;
+MotorState prevState = Middle;
+int prev_Pd = 0;
 
-int lastError = 0;
+const int maximum = 255;
+int last_proportional = 0;
+int integral = 0;
 
 float maxspeeda = 150;
 float maxspeedb = 150;
-float basespeeda = 50;
-float basespeedb = 50;
+float basespeeda = 110;
+float basespeedb = 110;
 
-void PID_control(unsigned int *sensor_values);
-
-// ******************희찬이가 만든 pid 
-// 끝
-
-
+/**********functions********************/
 void Motor_init();
 void Motor_Stop();
+void PID_control(unsigned int *sensor_values);
 
 int main() {
+    printf("\r\n\nStart!!\t\n\n");
+    
     int result = 0;
     Motor_init();
     
@@ -83,14 +88,73 @@ int main() {
     
     while(1) {
         PID_control(sensor_values);
-        // TR.calibrate();
-        // result = TR.readLine(sensor_values, 1);
-        // printf("speed = %f, result = %d  , sensor values: %u %u %u %u %u\r\n", 
-        //     (float)(basespeeda / maxspeeda), result, sensor_values[0], sensor_values[1], sensor_values[2], sensor_values[3], sensor_values[4]);
-        // ThisThread::sleep_for(100ms);
     }
 }
 
+void PID_control(unsigned int *sensor_values) {
+    TR.calibrate();
+    uint16_t position = TR.readLine(sensor_values); //ir1, ir2, ir3, ir4, ir5에 값이 들어감
+    
+    if(position == 0 || position == 4000) {
+        if(prevState == Left) {
+            Rweight = -1 * basespeeda + 10;
+            //Rweight = 10;
+        }
+        else {
+            //Lweight = 10;
+            Lweight = -1 * basespeedb + 10;
+        }
+        PWMA = (basespeeda + Lweight) / 150.0 ;
+        PWMB = (basespeedb + Rweight) / 150.0 ;
+        printf("\tOut! position: %d\t\n", position);
+        return;
+    }     
+    
+    int proportional = (int)position - 2000;
+    int derivative = proportional - last_proportional;
+    integral += proportional;
+    last_proportional = proportional;
+    int power_difference = proportional * Kp + integral * Ki + derivative * Kd;
+    
+    if (power_difference > maximum)
+        power_difference = maximum;
+    if (power_difference < -maximum)
+        power_difference = -maximum;
+    
+    printf("position: %d proportion: %d last_proportional: %d pd: %d\r\n", position, proportional, last_proportional, power_difference);
+    
+    // Left
+    if (power_difference < 0)
+    {
+        curState = Left;
+        if(prevState == Right) {
+            Rweight = 8;
+            Lweight = 3;
+            // printf("Right -> Left Turn\r\n");
+        }
+        PWMA = ((basespeeda + (float)power_difference / maximum * basespeeda) + Lweight) / 150.0;
+        PWMB = (basespeedb + Rweight) / 150.0 ;
+        // printf("Turn Left: position: %d proportion: %d last_proportional: %d pd: %d\r\n", position, proportional, last_proportional, power_difference);
+        prevState = Left;
+    }
+    // Right
+    else
+    {
+        curState = Right;
+        if(prevState == Left) {
+            Lweight = 8;
+            Rweight = 3;
+            //printf("Left -> Right Turn\r\n");
+        }
+        PWMA = (basespeeda + Lweight) / 150.0 ;
+        PWMB = ((basespeedb - (float)power_difference / maximum * basespeedb) + Rweight) / 150.0;
+        //printf("\tTurn Right: position: %d proportion: %d last_proportional: %d pd: %d\r\n", position, proportional, last_proportional, power_difference);
+        prevState = Right;
+    }      
+    Lweight = 0; Rweight = 0;
+    
+    ThisThread::sleep_for(10ms);
+}
 
 /********************Motor********************/
 void Motor_Stop(){
@@ -111,46 +175,10 @@ void Motor_init(){
 
     PWMA.period_us(500);
     PWMB.period_us(500);
-
-    I = 0;
     
     // den = 0;
     // R_PWM = 0;
     // L_PWM = 0;
     // weight= 0;
     // print_c = 0;
-}
-
-void PID_control(unsigned int *sensor_values){
-    TR.calibrate();
-    uint16_t position = TR.readLine(sensor_values, 1);
-    int error = 2000 - position;
-
-    P = error;
-    I = I + error;
-    D = error - lastError;
-    lastError = error;
-    int motorSpeed = P*Kp + I*Ki + D*Kd;
-
-    int motorspeeda = basespeeda + motorSpeed;
-    int motorspeedb = basespeedb - motorSpeed;
-
-    if (motorspeeda > maxspeeda) {
-        motorspeeda = maxspeeda;
-    }
-    if (motorspeedb > maxspeedb) {
-        motorspeedb = maxspeedb;
-    }
-    if (motorspeeda < 0) {
-        motorspeeda = 0;
-    }
-    if (motorspeedb < 0) {
-        motorspeedb = 0;
-    }
-    
-    PWMA = motorspeeda / 200.0;
-    PWMB = motorspeedb / 200.0;
-    
-    printf("error: %d, speedA: %f, speedB: %f, position: %d\r\n", 
-        error, (motorspeeda / maxspeeda), (motorspeedb / maxspeedb), position);
 }
