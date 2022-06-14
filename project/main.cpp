@@ -81,6 +81,13 @@ ReceiverIR irrecv(D4);
 
 void REMOTE_control(unsigned int *sensor_values);
 
+DigitalOut trigger(ARDUINO_UNO_D3);
+DigitalIn echo(ARDUINO_UNO_D7);
+Timer timer1;
+
+void ultraSonic_init();
+float get_ultra_dist();
+
 int main() {
     printf("\r\n\nAlphabot on!!\t\n\n");
     
@@ -90,6 +97,8 @@ int main() {
     unsigned int sensor_values[5] = {0};
     
     ThisThread::sleep_for(3000ms);
+
+    ultraSonic_init();
     
     printf("Start alphabot!\r\n");
 
@@ -107,6 +116,29 @@ int main() {
     while(1) {
         PID_control(sensor_values);
     }
+}
+
+void ultraSonic_init(){
+    trigger = 0;
+}
+
+float get_ultra_dist(){
+    float distance;
+    
+    trigger = 1;
+    wait_us(20);
+    trigger = 0;
+    
+    timer1.reset();
+    while(echo == 0) {}     // wait for echo high
+    timer1.start();         // when echo high, start time
+    while(echo == 1) {}     // wait for echo low
+    timer1.stop();
+    
+    // subtract software overhead timer delay and scale to cm
+    distance = timer1.elapsed_time().count() * 0.017;
+    
+    return distance;
 }
 
 void REMOTE_control(unsigned int *sensor_values){
@@ -231,68 +263,77 @@ void REMOTE_control(unsigned int *sensor_values){
 }
 
 void PID_control(unsigned int *sensor_values) {
-    TR.calibrate();
-    uint16_t position = TR.readLine(sensor_values); //ir1, ir2, ir3, ir4, ir5에 값이 들어감
-    
-    if(position == 0 || position == 4000) {
-        if(prevState == Left) {
-            Rweight = -1 * basespeeda + 10;
-            //Rweight = 10;
+
+    if(get_ultra_dist() < 10.0){
+        PWMA = 0.0;
+        PWMB = 0.0;
+    }else{
+        TR.calibrate();
+        uint16_t position = TR.readLine(sensor_values); //ir1, ir2, ir3, ir4, ir5에 값이 들어감
+        
+        if(position == 0 || position == 4000) {
+            if(prevState == Left) {
+                Rweight = -1 * basespeeda + 10;
+                //Rweight = 10;
+            }
+            else {
+                //Lweight = 10;
+                Lweight = -1 * basespeedb + 10;
+            }
+            PWMA = (basespeeda + Lweight) / 150.0 ;
+            PWMB = (basespeedb + Rweight) / 150.0 ;
+            printf("\tOut! position: %d\t\n", position);
+            return;
+        }     
+        
+        int proportional = (int)position - 2000;
+        int derivative = proportional - last_proportional;
+        integral += proportional;
+        last_proportional = proportional;
+        int power_difference = proportional * Kp + integral * Ki + derivative * Kd;
+        
+        if (power_difference > maximum)
+            power_difference = maximum;
+        if (power_difference < -maximum)
+            power_difference = -maximum;
+        
+        float distance = get_ultra_dist();
+        
+        printf("position: %d proportion: %d last_proportional: %d pd: %d, dist: %f\r\n", position, proportional, last_proportional, power_difference, distance);
+        
+        // Left
+        if (power_difference < 0)
+        {
+            curState = Left;
+            if(prevState == Right) {
+                Rweight = 8;
+                Lweight = 3;
+                // printf("Right -> Left Turn\r\n");
+            }
+            PWMA = ((basespeeda + (float)power_difference / maximum * basespeeda) + Lweight) / 150.0;
+            PWMB = (basespeedb + Rweight) / 150.0 ;
+            // printf("Turn Left: position: %d proportion: %d last_proportional: %d pd: %d\r\n", position, proportional, last_proportional, power_difference);
+            prevState = Left;
         }
-        else {
-            //Lweight = 10;
-            Lweight = -1 * basespeedb + 10;
-        }
-        PWMA = (basespeeda + Lweight) / 150.0 ;
-        PWMB = (basespeedb + Rweight) / 150.0 ;
-        printf("\tOut! position: %d\t\n", position);
-        return;
-    }     
-    
-    int proportional = (int)position - 2000;
-    int derivative = proportional - last_proportional;
-    integral += proportional;
-    last_proportional = proportional;
-    int power_difference = proportional * Kp + integral * Ki + derivative * Kd;
-    
-    if (power_difference > maximum)
-        power_difference = maximum;
-    if (power_difference < -maximum)
-        power_difference = -maximum;
-    
-    printf("position: %d proportion: %d last_proportional: %d pd: %d\r\n", position, proportional, last_proportional, power_difference);
-    
-    // Left
-    if (power_difference < 0)
-    {
-        curState = Left;
-        if(prevState == Right) {
-            Rweight = 8;
-            Lweight = 3;
-            // printf("Right -> Left Turn\r\n");
-        }
-        PWMA = ((basespeeda + (float)power_difference / maximum * basespeeda) + Lweight) / 150.0;
-        PWMB = (basespeedb + Rweight) / 150.0 ;
-        // printf("Turn Left: position: %d proportion: %d last_proportional: %d pd: %d\r\n", position, proportional, last_proportional, power_difference);
-        prevState = Left;
+        // Right
+        else
+        {
+            curState = Right;
+            if(prevState == Left) {
+                Lweight = 8;
+                Rweight = 3;
+                //printf("Left -> Right Turn\r\n");
+            }
+            PWMA = (basespeeda + Lweight) / 150.0 ;
+            PWMB = ((basespeedb - (float)power_difference / maximum * basespeedb) + Rweight) / 150.0;
+            //printf("\tTurn Right: position: %d proportion: %d last_proportional: %d pd: %d\r\n", position, proportional, last_proportional, power_difference);
+            prevState = Right;
+        }      
+        Lweight = 0; Rweight = 0;
+        
+        ThisThread::sleep_for(10ms);
     }
-    // Right
-    else
-    {
-        curState = Right;
-        if(prevState == Left) {
-            Lweight = 8;
-            Rweight = 3;
-            //printf("Left -> Right Turn\r\n");
-        }
-        PWMA = (basespeeda + Lweight) / 150.0 ;
-        PWMB = ((basespeedb - (float)power_difference / maximum * basespeedb) + Rweight) / 150.0;
-        //printf("\tTurn Right: position: %d proportion: %d last_proportional: %d pd: %d\r\n", position, proportional, last_proportional, power_difference);
-        prevState = Right;
-    }      
-    Lweight = 0; Rweight = 0;
-    
-    ThisThread::sleep_for(10ms);
+
 }
 
 /********************Motor********************/
