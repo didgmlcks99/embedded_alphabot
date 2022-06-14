@@ -79,7 +79,7 @@ bool calibration = true;
 RemoteIR::Format format = RemoteIR::NEC;
 ReceiverIR irrecv(D4);
 
-void REMOTE_control();
+void REMOTE_control(unsigned int *sensor_values);
 
 int main() {
     printf("\r\n\nAlphabot on!!\t\n\n");
@@ -94,7 +94,7 @@ int main() {
     printf("Start alphabot!\r\n");
 
     
-    REMOTE_control();
+    REMOTE_control(sensor_values);
 
     PWMA.pulsewidth_us(500);
     PWMB.pulsewidth_us(500);
@@ -109,7 +109,7 @@ int main() {
     }
 }
 
-void REMOTE_control(){
+void REMOTE_control(unsigned int *sensor_values){
     while(1){
         if(irrecv.getState() == ReceiverIR::Received
             && irrecv.getData(&format, buf, sizeof(buf)*8) != 0){
@@ -218,6 +218,10 @@ void REMOTE_control(){
                     break;
             }
         }
+
+        TR.calibrate();
+        uint16_t position = TR.readLine(sensor_values);
+        // printf("position: %d\r\n", position);
         
         if(!calibration) {
             printf("calibration false");
