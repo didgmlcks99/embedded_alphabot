@@ -8,17 +8,12 @@ UnbufferedSerial pc(CONSOLE_TX, CONSOLE_RX, 230400);
 
 /**********tracker sensor***********/
 TRSensors TR(D11, D12, D13, D10);
-/***********************************/
+/********************************FF***/
 /**********PID**********************/
 #define RATE 0.1
 #define numSensors 5
- 
-//Kc, Ti, Td, interval
-//PID controller(1.0, 0.0, 0.0, RATE);
-/**********Motor********************/
-// PwmOut PWMA(D6);  //PB_10,D6
-// PwmOut PWMB(D5);
 
+/**********Motor********************/
 // left motor
 DigitalOut AIN1(A1);
 DigitalOut AIN2(A0);
@@ -36,11 +31,6 @@ int P_temp; int Fix_temp;
 int print_c;
 int den;
 static int on_line[1];
-//typedef enum{LEFT = 0, RIGHT} DIRE;
-//DIRE direction;
-//DIRE Over_direction;
-//DIRE P_direction;
-//DIRE Obs_direction;
 /***********************************/
 /**********PID********************/
 float Kp = 0.08;
@@ -89,7 +79,6 @@ void Motor_Stop();
 void PID_control(unsigned int *sensor_values);
 void tick();
 void REMOTE_control(unsigned int *sensor_values);
-int calculatePosition(unsigned int *sensor_values, unsigned char white_line);
 
 void tick(){
     ultra.trig();
@@ -156,7 +145,7 @@ void PID_control(unsigned int *sensor_values) {
     int changeFlag = 0;
     
     TR.calibrate();
-    uint16_t position = TR.readLine(sensor_values); //ir1, ir2, ir3, ir4, ir5에 값이 들어감
+    uint16_t position = TR.readLine(sensor_values);
     
     printf("sensor values: %d %d %d %d %d\r\n", sensor_values[0], sensor_values[1], sensor_values[2], sensor_values[3], sensor_values[4]);
     
@@ -187,9 +176,6 @@ void PID_control(unsigned int *sensor_values) {
         power_difference = maximum;
     if (power_difference < -maximum)
         power_difference = -maximum;
-    
-    //printf("position: %d proportion: %d last_proportional: %d pd: %d\r\n", position, proportional, last_proportional, power_difference);
-    
     // Left
     if (power_difference < 0)
     {
@@ -197,11 +183,9 @@ void PID_control(unsigned int *sensor_values) {
         if(prevState == Right) {
             Rweight = 15;
             Lweight = 0;
-            // printf("Right -> Left Turn\r\n");
         }
         PWMA = ((basespeeda + (float)power_difference / maximum * basespeeda) + Lweight) / 150.0;
         PWMB = (basespeedb + Rweight) / 150.0 ;
-        // printf("Turn Left: position: %d proportion: %d last_proportional: %d pd: %d\r\n", position, proportional, last_proportional, power_difference);
         prevState = Left;
     }
     // Right
@@ -211,11 +195,9 @@ void PID_control(unsigned int *sensor_values) {
         if(prevState == Left) {
             Lweight = 15;
             Rweight = 0;
-            //printf("Left -> Right Turn\r\n");
         }
         PWMA = (basespeeda + Lweight) / 150.0 ;
         PWMB = ((basespeedb - (float)power_difference / maximum * basespeedb) + Rweight) / 150.0;
-        //printf("\tTurn Right: position: %d proportion: %d last_proportional: %d pd: %d\r\n", position, proportional, last_proportional, power_difference);
         prevState = Right;
     }      
     
@@ -224,51 +206,6 @@ void PID_control(unsigned int *sensor_values) {
     
     Lweight = 0; Rweight = 0;
     ThisThread::sleep_for(10ms);
-}
-
-int calculatePosition(unsigned int *sensor_values, unsigned char white_line)
-{
-    unsigned char i, on_line = 0;
-    unsigned long avg; // this is for the weighted total, which is long
-                       // before division
-    unsigned int sum; // this is for the denominator which is <= 64000
-    static int last_value=0; // assume initially that the line is left.
-
-    avg = 0;
-    sum = 0;
-  
-    for(i=0;i<numSensors;i++) {
-        int value = sensor_values[i];
-
-        if(!white_line)
-            value = 1000-value;
-        sensor_values[i] = value;
-        // keep track of whether we see the line at all
-        if(value > 500) {
-            on_line = 1;
-        }
-        
-        // only average in values that are above a noise threshold
-        if(value > 50) {
-            avg += (long)(value) * (i * 1000);
-            sum += value;
-        }
-    }
-
-    if(!on_line)
-    {
-        // If it last read to the left of center, return 0.
-         if(last_value < (numSensors-1)*1000/2)    // 2000보다 last value가 작으면 0 리턴 / last value 최종 위치
-             return 0;
-        
-        // If it last read to the right of center, return the max.
-         else
-             return (numSensors-1)*1000;   // 2000보다 last value가 크면 4000 리턴
-    }
-
-    last_value = avg/sum;
-
-    return last_value;
 }
 
 /********************IR********************/
@@ -304,11 +241,6 @@ void REMOTE_control(unsigned int *sensor_values){
                     printf("speed up\r\n");
                     break;    // +
                 case 0xF6:
-                    // left.speed(0.2);
-                    // right.speed(-0.2);
-                    // oled.clearDisplay();
-                    // oled.printf("Calibrating\r");
-                    // oled.display();
                     printf("Calibrating\r\n");
 
                     for (int i =0; i< 1000; i++)
@@ -349,15 +281,11 @@ void REMOTE_control(unsigned int *sensor_values){
                     PWMA = speed;
                     PWMB = speed + rightvar;
                     printf("left\r\n"); 
-                    // left.speed(speed/2);
-                    // right.speed(speed + rightvar);
                     break;    //4
                 case 0xE3:                 
                     PWMA = 0.0;
                     PWMB = 0.0;
                     printf("stop\r\n");
-                    // left.speed(0);
-                    // right.speed(0);
                     break;    //5
                 case 0xA5: 
                 
@@ -369,8 +297,6 @@ void REMOTE_control(unsigned int *sensor_values){
                     PWMA = speed;
                     PWMB = speed + rightvar;
                     printf("right\r\n");
-                    // left.speed(speed);
-                    // right.speed(speed/2 + rightvar);
                     break;    //6
                 case 0xBD: 
                     break;    //7
@@ -384,8 +310,6 @@ void REMOTE_control(unsigned int *sensor_values){
                     PWMA = speed;
                     PWMB = (speed + rightvar);
                     printf("back\r\n");
-                    // left.speed(-speed);
-                    // right.speed(-(speed + rightvar));
                     break;    //8
                 case 0xB5: 
                     break;    //9 
@@ -396,7 +320,6 @@ void REMOTE_control(unsigned int *sensor_values){
 
         TR.calibrate();
         uint16_t position = TR.readLine(sensor_values);
-        // printf("position: %d\r\n", position);
         
         if(!calibration) {
             printf("calibration false\r\n");
