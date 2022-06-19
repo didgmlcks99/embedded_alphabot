@@ -1,13 +1,19 @@
-Alphabot - Embedded Processor
+Embedded Final Project
 
-Needed Library (in Mbed)
-- Adafruit_GFX
-- PixelArray
-- RemoteIR
-- WS2812
-- hcsr04.cpp
-- hcsr04.h
-- IRreflection.cpp
-- IRreflection.h
-- PCF8574.cpp
-- PCF8574.h
+Alphabot Line Tracer
+
+Project
+┗RemoteIR
+  ┗ReceiverIR.cpp
+  ┗ReceiverIR.h
+  ┗RemoteIR.h
+  ┗TransmitterIR.cpp
+  ┗TransmitterIR.h
+┗TRSensors
+  ┗TRSensors.cpp
+  ┗TRSensors.h
+┗Ultrasonica
+  ┗Ultrasonic.cpp
+  ┗Ultrasonic.h
+┗main.cpp
+    

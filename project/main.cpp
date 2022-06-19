@@ -47,7 +47,8 @@ float Kp = 0.08;
 float Ki = 0.0009;
 float Kd = 10;
 
-int threshold = 300;
+//int threshold = 300;
+
 int Lweight = 0, Rweight = 0;
 enum MotorState {
     Middle, Left, Right
@@ -78,17 +79,9 @@ RemoteIR::Format format = RemoteIR::NEC;
 ReceiverIR irrecv(D4);
 
 /**********Ultrasonic********************/
-//DigitalOut trigger(ARDUINO_UNO_D3);
-//DigitalIn echo(ARDUINO_UNO_D7);
-//Timer timer1;
 Ultrasonic ultra(D3,D7);
 Ticker ticker;
 Thread ultra_thread;
-
-int distance_flag = 0;
-
-//void ultraSonic_init();
-//float get_ultra_dist();
 
 /**********functions********************/
 void Motor_init();
@@ -112,8 +105,6 @@ void rx_thread() {
             if(distance < 30){
                 PWMA = 0.0;
                 PWMB = 0.0;
-                //integral = 0;
-                //last_proportional = 0;
             }
         }
         ultra.clearStatus();
@@ -129,8 +120,6 @@ int main() {
     unsigned int sensor_values[5] = {0};
     
     ThisThread::sleep_for(3000ms);
-
-    //ultraSonic_init();
     
     printf("Start alphabot!\r\n");
 
@@ -153,10 +142,7 @@ int main() {
     AIN2 = 0;
     BIN1 = 1;
     BIN2 = 0;
-    
-//    startFlag = 1;
-//    PID_control(sensor_values);
-//    startFlag = 0;
+
     
     while(1) {
         PID_control(sensor_values);
@@ -164,30 +150,6 @@ int main() {
     ultra_thread.join();
 }
 
-/*
-void ultraSonic_init(){
-    trigger = 0;
-}
-
-float get_ultra_dist(){
-    float distance;
-    
-    trigger = 1;
-    wait_us(20);
-    trigger = 0;
-    
-    timer1.reset();
-    while(echo == 0) {}     // wait for echo high
-    timer1.start();         // when echo high, start time
-    while(echo == 1) {}     // wait for echo low
-    timer1.stop();
-    
-    // subtract software overhead timer delay and scale to cm
-    distance = timer1.elapsed_time().count() * 0.017;
-    
-    return distance;
-}
-*/
 
 /********************PID********************/
 void PID_control(unsigned int *sensor_values) {
@@ -195,38 +157,22 @@ void PID_control(unsigned int *sensor_values) {
     
     TR.calibrate();
     uint16_t position = TR.readLine(sensor_values); //ir1, ir2, ir3, ir4, ir5에 값이 들어감
-    /*
-    if(startFlag != 1) {
-        for(int i=0; i<5; i++) {
-            if(abs((int) (prev_sensor_values[i] - sensor_values[i])) > 100 && prev_sensor_values[i] != 1000)
-                sensor_values[i] = prev_sensor_values[i];
-                changeFlag = 1;
-        }
-    }
     
-    if(changeFlag == 1) {
-        printf("value changed: ");
-        position = calculatePosition(sensor_values, 0);
-    }
-    */
     printf("sensor values: %d %d %d %d %d\r\n", sensor_values[0], sensor_values[1], sensor_values[2], sensor_values[3], sensor_values[4]);
     
     if(position == 0 || position == 4000) {
         if(prevState == Left) {
             Rweight = -1 * basespeeda + 5;
-            //Rweight = 10;
             ThisThread::sleep_for(5ms);
             printf("Turn Left\r\n");
         }
         else {
-            //Lweight = 10;
             Lweight = -1 * basespeedb + 5;
             ThisThread::sleep_for(5ms);
             printf("\tTurn Right\r\n");
         }
         PWMA = (basespeeda + Lweight) / 150.0 ;
         PWMB = (basespeedb + Rweight) / 150.0 ;
-        //printf("\tOut! position: %d\t\n", position);
         
         return;
     }     
@@ -370,17 +316,6 @@ void REMOTE_control(unsigned int *sensor_values){
 
                     printf("done calibrating\r\n");
                     
-                    // oled.clearDisplay();
-                    // oled.printf("Calibrated!!\r");
-                    // oled.display();
-                    
-                    // for(int i =0; i<5;i++){
-                    //     pc.printf("MIN: %d, MAX: %d\r\n", MINIR[i], MAXIR[i]);    
-                    // }
-                    //    wait(0.7);
-                    //    left.speed(0.0);
-                    //    right.speed(0.0);
-                    // pc.printf("\r\ncalibrated\r\n"); 
                     break;    //EQ
                 case 0xE6: 
                     break;    //100+
@@ -489,10 +424,4 @@ void Motor_init(){
 
     PWMA.period_us(500);
     PWMB.period_us(500);
-    
-    // den = 0;
-    // R_PWM = 0;
-    // L_PWM = 0;
-    // weight= 0;
-    // print_c = 0;
 }
